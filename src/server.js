@@ -1,4 +1,4 @@
-// Load env only for local development
+// Load environment variables (only for local development)
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
@@ -11,27 +11,27 @@ const authRoutes = require("./routes/auth.routes");
 
 const app = express();
 
-/* ================= DB CONNECTION ================= */
-// IMPORTANT: do NOT connect on import in serverless
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    console.error("DB connection failed:", err);
-    res.status(500).json({ error: "Database connection failed" });
-  }
-});
-
 /* ================= MIDDLEWARE ================= */
+
+// ✅ CORS should come first
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
+    origin: process.env.CLIENT_URL, // frontend URL, no trailing slash
+    credentials: true, // allow cookies if needed
   }),
 );
 
+// ✅ JSON parsing
 app.use(express.json());
+
+/* ================= DB CONNECTION ================= */
+// Connect once on server start
+connectDB()
+  .then(() => console.log("✅ Database connected"))
+  .catch((err) => {
+    console.error("❌ DB connection failed:", err);
+    process.exit(1); // stop server if DB fails
+  });
 
 /* ================= ROOT ROUTE ================= */
 app.get("/", (req, res) => {
@@ -49,6 +49,11 @@ app.use("/api/test", require("./routes/test.routes"));
 app.use("/api/assessments", require("./routes/assessment.routes"));
 app.use("/api/readiness", require("./routes/readiness.routes"));
 
+/* ================= ERROR HANDLING ================= */
+app.use((req, res) => {
+  res.status(404).json({ error: "Route not found" });
+});
+
 /* ================= EXPORT APP ================= */
-// ❌ NO app.listen() on Vercel
+// ❌ No app.listen() on serverless (Vercel)
 module.exports = app;
